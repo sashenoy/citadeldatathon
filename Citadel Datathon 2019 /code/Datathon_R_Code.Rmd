@@ -1,0 +1,101 @@
+---
+title: "Datathon R code"
+author: "Sanjna Shenoy, Sicheng Lin, Tao Tu, Rehemaiti Dilireb"
+date: "2/23/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE, eval = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Tidying Data
+
+```{r}
+library(tibble)
+library(maps)
+library(sp)
+library(rgdal)
+library(ggplot2)
+library(maptools)
+library(tidyverse)
+library(urbnmapr)
+library(ggplot2)
+library(dplyr)
+
+seds <- read.csv('/Users/sanjnashenoy/Downloads/Datasets/seds.csv')
+plants <- read.csv('/Users/sanjnashenoy/Downloads/Datasets/power_plants.csv')
+
+seds <- as.tibble(seds)
+coal <- seds %>% filter(energy_bin == "Coal")
+
+write.csv(coal, "coal.csv")
+write.csv(renewable, "renewable.csv")
+renewable <- seds %>% filter(energy_bin == "Renewable")
+
+#identifying codebook
+codebook <- select(seds, c(msn, description))
+codebook <- codebook[!duplicated(msn), ]
+write.csv(codebook, "seds_codebook.csv") # for easy indexing 
+```
+
+# Coal Plots
+
+```{r}
+seds <- rename(seds,c('state_name'='State'))
+
+set <- seds %>% filter(msn=='CLTCP') %>% filter(State %in% c('Texas', 'Indiana', 'Ohio', 'Illinois', 'Kentucky', 'West Virginia', 'Pennsylvania', 'North Carolina', 'Florida', 'Missouri'))
+set2 <- seds %>% filter(msn=='CLTCD') %>% filter(State %in% c('Texas', 'Indiana', 'Ohio', 'Illinois', 'Kentucky', 'West Virginia', 'Pennsylvania', 'North Carolina', 'Florida', 'Missouri'))
+
+ggplot(set, aes(year, value, color = State)) + geom_line() + labs(title="Coal Consumption over Time in Top Ten States", y="Thousand Short Tons", x="Year", caption="Source: State Energy Data Systems") 
+
+ggplot(set2, aes(year, value, color = State)) + geom_line() + labs(title="Average Coal Price (All Sectors) in Top Ten States", y="Dollar Value", x="Year", caption="Source: State Energy Data Systems")
+```
+
+# Air pollution Mapping
+
+```{r, eval = FALSE}
+states <- map_data("state")
+pollution <- read.csv("/Users/sanjnashenoy/Downloads/Datasets/air_concentrations.csv")
+
+pollution <- read.csv("/Users/sanjnashenoy/Downloads/pollutant_concentration_by_state_year.csv")
+pollution <- mutate(pollution, region = abbr2state(pollution$state_code))
+
+map.df <- merge(states,pollution, by="region", all=T)
+
+ggplot(map.df, aes(x=long,y=lat,group=group))+
+  geom_polygon(aes(fill=total_SO2))+
+  geom_path()+ 
+  scale_fill_gradientn(colours=rev(heat.colors(10)),na.value="grey90")+
+  coord_map()
+```
+
+
+#more plots
+
+```{r, eval = FALSE}
+
+df1 %>% ggplot(mapping = aes(longitude, latitude, group = group) + 
+  geom_polygon(data = urbnmapr::counties, mapping = aes(x = long, y = lat, group = group)) + scale_fill_gradientn(colours=rev(heat.colors(10)),na.value="grey90") +
+coord_map(projection = "albers", lat0 = 39, lat1 = 45)
+```
+
+#even more plots
+
+```{r}
+pollution <- read.csv("/Users/sanjnashenoy/Downloads/pollutant_concentration_by_county_year.csv")
+
+tidydf <- pollution %>% select(c(year, state_code, county, total_SO2, total_NO3, latitude, longitude))
+pol2000 <- subset(tidydf, year == "2000")
+pol2008 <- subset(tidydf, year == "2008")
+pol2010 <- subset(tidydf, year == "2010")
+
+df1$region <- tolower(df1$region)
+us_counties <- map_data("county")
+new_df <- left_join(us_counties, df1)
+
+df1 <- pol2000 %>% select(county, total_SO2)
+colnames(df1) <- c("region", "value")
+county_choropleth(df1)
+```
+
